@@ -88,3 +88,12 @@
 🌑 glitch écran + info fausse
 💀 mort quasi inévitable
 💀 monstre constament attiré par toi peut importe la distance
+
+
+🟢 Léger changement 35%
+🟡 Changement constaté 25%
+🟠 Dur à gérer 18%
+🔴 Très difficile 12%
+🔥 Presque impossible 7%
+🌑 Impossible 3%
+a changer selon le niveau de jeux 
