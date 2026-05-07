@@ -424,3 +424,255 @@ Créer un système :
 abus admin
 faux positifs anti-cheat
 surcharge serveur
+
+
+partie 2 
+
+# 🤖🔥 REAL-TIME ANTI-CHEAT + ADMIN SYSTEM
+## 🎮 Full Stack Node.js + Socket.io + React
+
+---
+
+# 📑 TABLE DES MATIÈRES
+
+1. Anti-Cheat System  
+2. Logger System  
+3. Command Handler  
+4. Admin Panel (Realtime React)  
+
+---
+
+# 🤖 1. ANTI-CHEAT SYSTEM
+
+## 🎯 Objectif
+Détecter la triche en temps réel et appliquer des sanctions automatiques.
+
+---
+
+## 📊 Logique
+Chaque joueur possède un score :
+cheatScore = 0
+---
+
+## ⚠️ Détection
+
+- Vitesse trop élevée  
+- Dégâts trop élevés  
+- Téléportation anormale  
+- Comportement suspect  
+
+---
+
+## 📄 antiCheat.js
+
+javascript :
+
+const MAX_SPEED = 10;
+const MAX_DAMAGE = 999;
+
+function checkCheat(player) {
+
+  if (player.speed > MAX_SPEED) {
+    player.cheatScore += 10;
+    log("ALERT", `${player.id} speed hack`);
+  }
+
+  if (player.damage > MAX_DAMAGE) {
+    player.cheatScore += 15;
+    log("ALERT", `${player.id} damage hack`);
+  }
+
+  if (player.position.x > 10000 || player.position.y > 10000) {
+    player.cheatScore += 20;
+    log("ALERT", `${player.id} teleport hack`);
+  }
+
+  analyseBehavior(player);
+
+  if (player.cheatScore >= 50) freezePlayer(player);
+  if (player.cheatScore >= 80) kickPlayer(player);
+  if (player.cheatScore >= 100) banPlayer(player);
+}
+
+function analyseBehavior(player) {
+
+  if (player.critRate && player.critRate > 0.9) {
+    player.cheatScore += 10;
+  }
+
+  if (player.reactionTime && player.reactionTime < 50) {
+    player.cheatScore += 15;
+  }
+}
+
+function freezePlayer(player) {
+  log("ACTION", `Freeze ${player.id}`);
+}
+
+function kickPlayer(player) {
+  log("ACTION", `Kick ${player.id}`);
+}
+
+function banPlayer(player) {
+  log("ACTION", `Ban ${player.id}`);
+}
+
+module.exports = { checkCheat };
+
+📜 2. LOGGER SYSTEM
+🎯 Objectif
+Enregistrer toutes les actions importantes.
+
+📄 logger.js
+JavaScript : 
+function log(type, message) {  
+  const timestamp = new Date().toISOString();  
+  
+  const logMsg = `[${timestamp}] [${type}] ${message}`;  
+  
+  console.log(logMsg);  
+  
+  // Option : sauvegarde fichier  
+  // fs.appendFileSync("logs.txt", logMsg + "\\n"); 
+}
+  
+module.exports = { log };
+
+📊 Exemple de logs
+[ALERT] Player1 speed hack
+[ACTION] Freeze Player1
+[ADMIN] Kick Player1
+
+⚡ 3. COMMAND HANDLER
+🎯 Objectif
+Gérer toutes les commandes admin.
+
+📄 CommandHandler.js
+JavaScript : 
+
+function handleAdminCommand(cmd) {
+
+  switch(cmd.type) {
+
+    case "kick":
+      kickPlayer(cmd.player);
+      break;
+
+    case "ban":
+      banPlayer(cmd.player);
+      break;
+
+    case "spawnBoss":
+      console.log("Spawn Boss:", cmd.name);
+      break;
+
+    case "eventChaos":
+      console.log("Chaos event triggered");
+      break;
+
+    case "gacha":
+      console.log("Force gacha:", cmd.player);
+      break;
+
+    default:
+      console.log("Unknown command");
+  }
+}
+
+// Exemple functions
+
+function kickPlayer(id) {
+  console.log("Kick:", id);
+}
+
+function banPlayer(id) {
+  console.log("Ban:", id);
+}
+
+module.exports = { handleAdminCommand };
+
+🌐 4. ADMIN PANEL REALTIME (REACT + SOCKET)
+🎯 Objectif
+Interface admin en temps réel connectée au serveur.
+
+📄 App.js
+JavaScript : 
+
+import { useEffect, useState } from "react";
+import io from "socket.io-client";
+
+const socket = io("http://localhost:3000");
+
+export default function App() {
+
+  const [players, setPlayers] = useState([]);
+
+  useEffect(() => {
+
+    socket.on("playerUpdate", (data) => {
+      setPlayers((prev) => {
+        return [...prev.filter(p => p.id !== data.id), data];
+      });
+    });
+
+  }, []);
+
+  function sendCommand(type, player) {
+
+    socket.emit("adminCommand", {
+      type,
+      player
+    });
+  }
+
+  return (
+    <div style={{
+      background: "#0b0f1a",
+      color: "#e0e6ff",
+      padding: 20,
+      fontFamily: "Arial"
+    }}>
+
+      <h1>🛠️ ADMIN PANEL</h1>
+
+      {players.map((p) => (
+        <div key={p.id} style={{
+          border: "1px solid #333",
+          padding: 10,
+          marginBottom: 10
+        }}>
+
+          <p>ID: {p.id}</p>
+          <p>Speed: {p.speed}</p>
+          <p>Damage: {p.damage}</p>
+          <p>Cheat Score: {p.cheatScore}</p>
+
+          <button onClick={() => sendCommand("kick", p.id)}>
+            Kick
+          </button>
+
+          <button onClick={() => sendCommand("ban", p.id)}>
+            Ban
+          </button>
+
+        </div>
+      ))}
+
+    </div>
+  );
+}
+
+🔄 5. REAL-TIME FLOW
+Player → send data →
+Server → AntiCheat →
+Score update →
+Socket →
+Admin UI →
+Admin command
+
+
+🔐 6. SÉCURITÉ
+
+serveur valide toutes les actions ✅
+client non fiable ❌
+anti-cheat en continu ✅
