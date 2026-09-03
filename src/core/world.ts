@@ -997,3 +997,10 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
     tickHitstun(e, dt);
   }
 }
+
+/** Restaure PV (max courant) et énergie — soin PNJ (Mira) et commande /heal. */
+export function healFull(player: Player, maxEnergy: number): void {
+  player.health.maxHp = maxHpFor(player);
+  player.health.hp = player.health.maxHp;
+  player.energy = maxEnergy;
+}

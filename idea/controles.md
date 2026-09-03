@@ -23,7 +23,6 @@
 | Arbre de compétences / classe | K |
 | Capacités actives | R / C / V / B |
 | Panneau debug (tuning, godmode…) | F1 |
-| Console d'administration web (ouvre /admin.html, connexion admin/admin1234) | F2 |
 
 🗺️ CARTE DU MONDE (touche M)
 - **Molette** = zoomer/dézoomer (centré sur le curseur)

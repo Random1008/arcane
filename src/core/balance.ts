@@ -1,5 +1,5 @@
 /**
- * Réglages d'équilibrage **mutables en direct** (pilotés par la console admin), lus par loot/shop/world.
+ * Réglages d'équilibrage **mutables en direct**, lus par loot/shop/world.
  * Les valeurs par défaut reproduisent exactement le comportement d'origine (multiplicateurs à 1).
  */
 export interface Balance {

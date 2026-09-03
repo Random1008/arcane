@@ -13,12 +13,10 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "express": "^5.2.1",
-    "phaser": "^3.80.1",
-    "ws": "^8.21.0"
+    "phaser": "^3.80.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/ws": "^8.18.1",
     "concurrently": "^10.0.3",
     "tsx": "^4.22.4",
     "typescript": "^5.4.0",

@@ -1,9 +1,7 @@
 import Phaser from "phaser";
 import { buildPlaceholders, queueRealAssets } from "../../assets/placeholders";
-import { tickWorld, World, Npc, InputState, spawnChasers, killAllEnemies } from "../../core/world";
-import { healFull } from "../../core/admin";
+import { tickWorld, World, Npc, InputState, spawnChasers, killAllEnemies, healFull } from "../../core/world";
 import { saveToServer } from "../net/saveClient";
-import { emitGameEvent } from "../net/adminClient";
 import { playSfx, playMusic } from "../audio/audioEngine";
 import { generateBiomeWorld } from "../../core/generate";
 import { generateDungeon, generateRoomWorld, roomById, opposite, entryPos, Dungeon, Dir, isPuzzleRoom, puzzleResolved } from "../../core/dungeon";
@@ -37,9 +35,6 @@ import { respec, abilityForSlot, ABILITY_KEYS } from "../../core/skills";
 import { CLASS_UNLOCK_LEVEL } from "../../core/classes";
 import { COMMANDS } from "../../core/commands";
 import { createDebugPanel } from "../debug/debugPanel";
-import { setAdminHooks } from "../debug/adminBridge";
-import { makeBoss } from "../../core/boss";
-import { bossForTier } from "../../core/bosses";
 import { DialogueBox } from "../render/dialogueBox";
 import { ChatBox } from "../ui/chatBox";
 import { getPlayer, getFlags, markIdentified, markCleared, isCleared, hasClearedRank, isNexusUnlocked, isRingFinal, getNexusBest, markNexusBest } from "../session";
@@ -235,37 +230,7 @@ export class BiomeScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, lb.w, lb.h);
     this.cameras.main.centerOn(this.world.player.transform.pos.x, this.world.player.transform.pos.y);
     createDebugPanel(this.tuning, this.flags);
-    // hooks admin dépendant de la scène (spawn / Nexus) ; retirés à la fermeture de la scène
-    setAdminHooks({
-      spawnBoss: () => {
-        if (this.biomeId === "spawn" && !this.nexusMode) return "indisponible au Sanctuaire (zone sûre)";
-        const tier = this.world.biome?.tier ?? "F";
-        this.world.boss = makeBoss(bossForTier(tier), tier, this.world.level.bounds.w / 2, 140);
-        this.hadBoss = true;
-        this.cleared = false;
-        this.showBossIntro();
-        return `boss ${this.world.boss.name} invoqué`;
-      },
-      spawnEnemies: (n: number) => {
-        if (this.biomeId === "spawn" && !this.nexusMode) return "indisponible au Sanctuaire (zone sûre)";
-        const c = spawnChasers(this.world, n, this.world.biome?.tier ?? "F");
-        this.hadEnemies = true;
-        this.cleared = false;
-        return `${c} ennemi(s) invoqué(s)`;
-      },
-      killAll: () => {
-        const n = killAllEnemies(this.world) + (this.world.boss ? 1 : 0);
-        if (this.world.boss) this.world.boss.health.hp = 0;
-        return `${n} ennemi(s) éliminé(s)`;
-      },
-      gotoNexus: () => {
-        if (this.nexusMode) return "déjà dans le Nexus";
-        this.scene.start("biome", { nexus: true });
-        return "→ Nexus";
-      },
-      context: () => ({ biome: this.nexusMode ? `Nexus niv. ${this.nexusLevel}` : this.world.biome?.name ?? this.biomeId, nexus: this.nexusMode }),
-    });
-    this.events.once("shutdown", () => setAdminHooks(null));
+    l));
     // Touches enregistrées comme Key (emitOnRepeat=false par défaut → pas d'auto-répétition)
     // et auto-détruites au shutdown de la scène.
     const kb = this.input.keyboard!;
@@ -316,7 +281,6 @@ export class BiomeScene extends Phaser.Scene {
     });
 
     this.showBossIntro();
-    emitGameEvent("zone", `entré : ${this.nexusMode ? "Nexus" : biome.name}`);
   }
 
   /** Carte d'intro du boss (nom + réplique) ; rejouée aussi à l'entrée d'une salle de boss (donjon/Nexus). */
@@ -611,7 +575,6 @@ export class BiomeScene extends Phaser.Scene {
     playSfx("death");
     const dropped = respawnPlayer(getPlayer(), Math.random);
     void saveToServer(); // persiste l'état APRÈS respawn (pertes d'objets prises en compte)
-    emitGameEvent("mort", `mort — ${dropped} objet(s) perdu(s)`);
     const w = this.scale.width;
     const h = this.scale.height;
     this.add.rectangle(w / 2, h / 2, w, h, 0x6a0000, 0.55).setScrollFactor(0).setDepth(60);

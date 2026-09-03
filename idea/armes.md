@@ -36,7 +36,7 @@ Chaque arme nommée = **une famille + des modificateurs de stats + des effets**.
 - 🔴 **A** : Épée du roi, Dague du néant, Arc des étoiles, Bâton cosmique, Lance antique, Hache ancienne, Marteau des dieux, Arbalète divine, Fléau ultime, Katana mythique, Arc lumière, Lance dimensionnelle, Bâton stellaire, Dague ultime, Masse divine
 - ⚫ **S** : Épée du chaos, Dague du temps, Arc éternité, Bâton absolu, Lance dimension, Hache néant, Marteau cosmique, Arbalète infinie, Fléau apocalypse, Katana des dieux, Arc infini, Lance ultime, Bâton universel, Dague parfaite, Masse du chaos
 
-Ids et effets exacts : console admin (F2) → Référence → « Armes nommées », ou `src/core/combat/catalog.ts`.
+Ids et effets exacts : `src/core/combat/catalog.ts`.
 
 💥 EFFETS D'ARMES (moteur `effects.ts`)
 - **Statuts (DoT)** : **brûlure** (rafraîchit), **poison** (stacke ×5), **saignement** — dégâts par paquets de 0,5 s ; tuent et créditent XP/or/loot comme un coup direct. Fonctionnent aussi sur les **boss**.
@@ -61,7 +61,7 @@ Ids et effets exacts : console admin (F2) → Référence → « Armes nommées 
 - **Biomes** : 2-3 armes nommées du tier du biome posées au sol.
 - **Boutique de Tibo** : rayon fixe = 6 armes nommées du tier joueur (sélection stable sur la journée),
   rayon journalier = armes nommées aléatoires (20% au tier joueur+2).
-- **Commande** : `/give <id> [tier]` (tier par défaut = tier intrinsèque de l'arme nommée) ; console admin F2.
+- **Commande** : `/give <id> [tier]` (tier par défaut = tier intrinsèque de l'arme nommée).
 
 📈 TIERS (rareté F → S)
 Touche **T** pour cycler le tier de l'arme active (cheat/debug). Le tier multiplie l'**ATK** :

@@ -1,8 +1,7 @@
-/** Appels d'authentification partagés (jeu + admin). Proxifiés par Vite vers le backend :8787. */
+/** Appels d'authentification du jeu. Proxifiés par Vite vers le backend :8787. */
 
 export interface AuthResult {
   token: string;
-  role: string;
   username: string;
 }
 

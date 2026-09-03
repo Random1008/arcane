@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import os from "node:os";
 import path from "node:path";
 import { safeName, writeSave, loadSave, listSaves } from "../server/saves";
-import { seedAccounts, createAccount, setRole, setBanned, addSanction, isValidRole, Hasher } from "../server/accounts";
-import { validateEvent } from "../src/core/adminProtocol";
+import { createAccount, Hasher, USERNAME_RE } from "../server/accounts";
 import { resetSession, serialize, hydrate, getPlayer, isCleared, getNexusBest, markCleared, markNexusBest, SaveData } from "../src/game/session";
 
 const fake: Hasher = { hash: (p) => "#" + p, compare: (p, h) => h === "#" + p };
@@ -34,76 +33,26 @@ describe("sauvegardes serveur", () => {
   });
 });
 
-describe("modération / rôles", () => {
-  it("isValidRole", () => {
-    expect(isValidRole("admin")).toBe(true);
-    expect(isValidRole("player")).toBe(true);
-    expect(isValidRole("root")).toBe(false);
-  });
-
-  it("setRole : change un rôle, refuse de rétrograder le dernier admin", () => {
-    let a = seedAccounts([], fake); // contient 1 admin
-    a = createAccount(a, "bob", "pw", "player", fake).accounts!;
-    expect(setRole(a, "bob", "operator").accounts!.find((x) => x.username === "bob")?.role).toBe("operator");
-    expect(setRole(a, "admin", "player").ok).toBe(false); // dernier admin protégé
-    expect(setRole(a, "inconnu", "player").ok).toBe(false);
-  });
-
-  it("setBanned : bannit un joueur (+ sanction), refuse de bannir un admin", () => {
-    let a = seedAccounts([], fake);
-    a = createAccount(a, "bob", "pw", "player", fake).accounts!;
-    const r = setBanned(a, "bob", true, "admin", "triche", 1000);
-    expect(r.ok).toBe(true);
-    const bob = r.accounts!.find((x) => x.username === "bob")!;
-    expect(bob.banned).toBe(true);
-    expect(bob.sanctions?.[0]).toMatchObject({ type: "ban", reason: "triche" });
-    expect(setBanned(a, "admin", true, "admin", "", 1000).ok).toBe(false); // pas de ban d'admin
-  });
-
-  it("setRole vers admin lève le ban (jamais d'admin banni)", () => {
-    let a = seedAccounts([], fake);
-    a = createAccount(a, "bob", "pw", "player", fake).accounts!;
-    a = setBanned(a, "bob", true, "admin", "", 1).accounts!;
-    const promoted = setRole(a, "bob", "admin").accounts!.find((x) => x.username === "bob")!;
-    expect(promoted.role).toBe("admin");
-    expect(promoted.banned).toBe(false);
-  });
-
-  it("addSanction : ajoute à l'historique, préserve l'existant, no-op si compte absent", () => {
-    let a = seedAccounts([], fake);
-    a = createAccount(a, "bob", "pw", "player", fake).accounts!;
-    a = setBanned(a, "bob", true, "admin", "x", 1).accounts!;
-    a = addSanction(a, "bob", { type: "warn", by: "admin", reason: "spam", at: 2 });
-    const bob = a.find((x) => x.username === "bob")!;
-    expect(bob.sanctions?.length).toBe(2);
-    expect(bob.sanctions?.[1]).toMatchObject({ type: "warn", reason: "spam" });
-    expect(addSanction(a, "fantome", { type: "kick", by: "admin", reason: "", at: 3 })).toEqual(a); // no-op
-  });
-});
-
-describe("protocole événements", () => {
-  it("validateEvent accepte {type,msg}, rejette le reste, tronque", () => {
-    expect(validateEvent({ type: "zone", msg: "entré : Plaines" })).toEqual({ type: "zone", msg: "entré : Plaines" });
-    expect(validateEvent({ type: "x" })).toBe(null);
-    expect(validateEvent({ msg: "y" })).toBe(null);
-    expect(validateEvent(null)).toBe(null);
-    expect(validateEvent({ type: "t", msg: "a".repeat(500) })!.msg.length).toBe(300);
-  });
-});
-
 describe("comptes joueurs", () => {
-  it("createAccount accepte le rôle player", () => {
-    const a = createAccount(seedAccounts([], fake), "joueur", "pw", "player", fake);
+  it("createAccount enregistre un joueur", () => {
+    const a = createAccount([], "joueur", "pw", fake);
     expect(a.ok).toBe(true);
-    expect(a.accounts!.find((x) => x.username === "joueur")?.role).toBe("player");
+    expect(a.accounts!.find((x) => x.username === "joueur")?.username).toBe("joueur");
+  });
+
+  it("createAccount refuse un doublon", () => {
+    const base = createAccount([], "bob", "pw", fake).accounts!;
+    expect(createAccount(base, "bob", "pw2", fake).ok).toBe(false);
   });
 
   it("createAccount n'accepte que des identifiants [a-z0-9_-] (mapping save 1:1, anti-collision)", () => {
-    const base = seedAccounts([], fake);
-    expect(createAccount(base, "Bob", "pw", "player", fake).ok).toBe(false); // majuscule
-    expect(createAccount(base, "a.b", "pw", "player", fake).ok).toBe(false); // point
-    expect(createAccount(base, "héros", "pw", "player", fake).ok).toBe(false); // accent
-    const ok = createAccount(base, "bob_1", "pw", "player", fake);
+    const base = createAccount([], "alice", "pw", fake).accounts!;
+    expect(createAccount(base, "Bob", "pw", fake).ok).toBe(false); // majuscule
+    expect(createAccount(base, "a.b", "pw", fake).ok).toBe(false); // point
+    expect(createAccount(base, "héros", "pw", fake).ok).toBe(false); // accent
+    expect(USERNAME_RE.test("")).toBe(false);
+    expect(USERNAME_RE.test("a".repeat(33))).toBe(false);
+    const ok = createAccount(base, "bob_1", "pw", fake);
     expect(ok.ok).toBe(true);
     expect(safeName("bob_1")).toBe("bob_1"); // identifiant valide → nom de fichier identique
   });

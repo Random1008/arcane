@@ -4,7 +4,6 @@ import { BiomeScene } from "./game/scenes/BiomeScene";
 import { createDebugPanel } from "./game/debug/debugPanel";
 import { DEFAULT_TUNING } from "./core/config/tuning";
 import { getFlags } from "./game/session";
-import { startAdminClient } from "./game/net/adminClient";
 import { showLoginGate } from "./game/auth/loginGate";
 import { getToken, getUser, clearToken } from "./shared/authStore";
 import { loadOrVerify, saveToServer, startAutoSave } from "./game/net/saveClient";
@@ -46,13 +45,6 @@ function startGame(): void {
   started = true;
   new Phaser.Game(config);
   createDebugPanel(DEFAULT_TUNING, getFlags()); // F1
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "F2") {
-      e.preventDefault();
-      window.open("/admin.html", "_blank"); // console d'administration
-    }
-  });
-  startAdminClient();
   startAutoSave();
   accountBar();
   // politique autoplay : l'AudioContext ne démarre qu'après un geste utilisateur

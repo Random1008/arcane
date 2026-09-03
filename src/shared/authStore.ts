@@ -1,5 +1,5 @@
 /**
- * Stockage du jeton d'authentification, partagé jeu/admin.
+ * Stockage du jeton d'authentification du joueur.
  * « rester connecté » coché → localStorage (persiste) ; sinon sessionStorage (le temps de la session).
  */
 const TKEY = "sp-auth-token";

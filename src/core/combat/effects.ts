@@ -30,7 +30,7 @@ export type WeaponEffect =
 
 export type EffectKind = WeaponEffect["kind"];
 
-/** Libellés FR courts (HUD, boutique, console admin). */
+/** Libellés FR courts (HUD, boutique). */
 export const EFFECT_LABEL: Record<EffectKind, string> = {
   burn: "brûlure",
   poison: "poison",

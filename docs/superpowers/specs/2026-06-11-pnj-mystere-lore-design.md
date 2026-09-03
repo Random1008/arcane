@@ -172,7 +172,7 @@ non vu**.
 | `src/game/scenes/BiomeScene.ts` | `case "summon"` (AÏON au curseur / pickup d'arme au curseur / pièce d'armure / livre en hotbar) ; clic droit sur livre → `learnBook` | Phaser |
 | `game/idea/lore.md` | **nouveau** doc d'état (idea/), synchronisé avec l'implémentation | doc |
 | `game/idea/a implementer/lore.md` | **déplacé/retiré** une fois implémenté (sort du dossier « à implémenter ») | doc |
-| `game/idea/admin.md` + `game/README.md` | mention du PNJ AÏON, touche du codex, commande `/summon` | doc |
+| `game/idea/lore.md` + `game/README.md` | mention du PNJ AÏON, touche du codex, commande `/summon` | doc |
 
 Frontière nette : **toute la logique testable vit dans `core/lore.ts` + `session.ts`** ; la
 couche Phaser ne fait que **tirer, placer, afficher**. Aucune règle de gating/aléatoire dans
@@ -180,7 +180,7 @@ les scènes.
 
 ## 10. Outils dev — commande `/summon`
 
-Commande de chat **dev/admin** (même canal que `/give`, `/spawn`…), surtout utile pour
+Commande de chat **dev** (même canal que `/give`, `/spawn`…), surtout utile pour
 **forcer l'apparition d'AÏON** (spawn normalement aléatoire 15–45 %) et pour tester le lore.
 
 | Sous-commande | Effet | Destination |

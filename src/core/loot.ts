@@ -35,7 +35,7 @@ export function omganiumChance(biasLevel: number, source: "enemy" | "boss" | "ch
   const ti = Math.min(6, Math.max(0, biasLevel));
   if (ti < OMGANIUM_MIN_RANK) return 0; // rien avant le rang A
   const base = source === "boss" ? 0.2 + (ti - 5) * 0.1 : source === "chest" ? 0.17 + (ti - 5) * 0.1 : 0.002 + ti * 0.003;
-  return base * BALANCE.omganiumMult; // boss A20%/S30%, coffre A17%/S27%, ennemi très rare — ×réglage admin
+  return base * BALANCE.omganiumMult; // boss A20%/S30%, coffre A17%/S27%, ennemi très rare — réglage
 }
 
 /** Convertit une rareté en (tier d'arme, omega). Ω = arme S + drapeau omega. */

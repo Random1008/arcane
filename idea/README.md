@@ -17,7 +17,6 @@ Ce dossier décrit **tout le contenu** du jeu — un fichier par système. Chaqu
 - [`progression.md`](progression.md) — 📈 XP, niveaux, points de stat
 - [`class-et-arbre-de-competence.md`](class-et-arbre-de-competence.md) — 🌳 Classes & arbres de compétences
 - [`controles.md`](controles.md) — 🎮 Touches & commandes
-- [`admin.md`](admin.md) — 🛠️ Outils dev (panneau debug F1, panneau admin F2)
 - [`audio.md`](audio.md) — 🔊 Audio (SFX synthétisés, musique d'ambiance, volumes F1)
 
 ℹ️ Le code de référence est sous `src/core/` (logique) et `src/game/` (Phaser).

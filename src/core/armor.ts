@@ -51,7 +51,7 @@ export const ARMOR_EFFECT_LABEL: Record<ArmorEffectKind, string> = {
   revive: "résurrection",
 };
 
-/** Description courte d'un effet (UI équipement / boutique / admin). */
+/** Description courte d'un effet (UI équipement / boutique). */
 export function armorEffectDesc(e: ArmorEffect): string {
   switch (e.kind) {
     case "resist": return `résist ${Math.round(e.pct * 100)}%`;
