@@ -6,6 +6,7 @@ vit dans `src/core/` (pure, testée) ; `src/game/` est la couche Phaser (rendu, 
 ## Lancer
 
 ```bash
+cd game
 npm install
 npm run dev
 ```
@@ -18,27 +19,22 @@ Le jeu s'ouvre sur une **page de connexion** : il faut un **compte** pour jouer.
 (bouton « Créer un compte ») ou se connecter, avec une case **« Rester connecté »** (cochée = session
 persistante via localStorage ; décochée = le temps de la session). La **progression est sauvegardée par
 compte** côté serveur (auto‑save + à la mort/sortie). Bouton **Déconnexion** en haut de l'écran.
-Les comptes peuvent aussi être créés depuis la **console d'administration** (rôles `player`/`operator`/`admin`).
 Nécessite le serveur (`npm run dev` le lance).
 
-## Console d'administration (backend + comptes)
+## Serveur (comptes & sauvegardes)
 
 ```bash
-npm run dev        # lance le jeu (Vite) ET le serveur admin (port 8787) ensemble
+npm run dev        # lance le jeu (Vite) ET le serveur (port 8787) ensemble
 # jeu seul : npm run dev:game   ·   serveur seul : npm run server
 ```
 
-Dans le jeu, **F2** ouvre la **console d'administration** (`/admin.html`) dans un nouvel onglet.
-⚠️ Le login échoue (HTTP 500) si le **serveur admin n'est pas lancé** — `npm run dev` le démarre avec le jeu.
-Connexion par défaut : **admin / admin1234**. La console pilote le jeu **en direct** (joueur, monde,
-combat, réglages live, contenu/économie) et gère les **comptes**. Outil **dev local** (auth réelle
-bcrypt+JWT, non durci pour une exposition publique). Voir `idea/admin.md`.
+⚠️ Le login échoue (HTTP 500) si le **serveur n'est pas lancé** — `npm run dev` le démarre avec le jeu.
 
 ## Tests
 
 ```bash
 npm test        # logique core/ + serveur (Vitest, headless)
-npm run build   # vérif TypeScript + build de production (jeu + page admin)
+npm run build   # vérif TypeScript + build de production
 ```
 
 ## Contrôles
@@ -54,7 +50,6 @@ npm run build   # vérif TypeScript + build de production (jeu + page admin)
 | Dash | Espace |
 | Blink / téléportation | E |
 | Panneau debug | F1 |
-| Panneau admin (or, niveaux, classes, déblocage, spawn, Nexus) | F2 |
 
 ## Armes (barre d'inventaire façon Minecraft)
 
