@@ -6,7 +6,6 @@ vit dans `src/core/` (pure, testée) ; `src/game/` est la couche Phaser (rendu, 
 ## Lancer
 
 ```bash
-cd game
 npm install
 npm run dev
 ```

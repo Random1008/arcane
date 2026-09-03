@@ -20,5 +20,5 @@ Ce dossier décrit **tout le contenu** du jeu — un fichier par système. Chaqu
 - [`admin.md`](admin.md) — 🛠️ Outils dev (panneau debug F1, panneau admin F2)
 - [`audio.md`](audio.md) — 🔊 Audio (SFX synthétisés, musique d'ambiance, volumes F1)
 
-ℹ️ Le code de référence est sous `game/src/core/` (logique) et `game/src/game/` (Phaser).
-Le `game/README.md` résume comment jouer.
+ℹ️ Le code de référence est sous `src/core/` (logique) et `src/game/` (Phaser).
+Le `README.md` (racine) résume comment jouer.
