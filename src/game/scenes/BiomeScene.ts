@@ -230,7 +230,6 @@ export class BiomeScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, lb.w, lb.h);
     this.cameras.main.centerOn(this.world.player.transform.pos.x, this.world.player.transform.pos.y);
     createDebugPanel(this.tuning, this.flags);
-    l));
     // Touches enregistrées comme Key (emitOnRepeat=false par défaut → pas d'auto-répétition)
     // et auto-détruites au shutdown de la scène.
     const kb = this.input.keyboard!;
