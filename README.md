@@ -6,7 +6,6 @@ vit dans `src/core/` (pure, testée) ; `src/game/` est la couche Phaser (rendu, 
 ## Lancer
 
 ```bash
-cd game
 npm install
 npm run dev
 ```
@@ -137,7 +136,7 @@ donjon** = carrés sombres, à remplir plus tard). Reviens à la carte via la so
 ## Art
 
 Le jeu tourne avec des placeholders géométriques. Pour brancher ton pixel art :
-**dépose tes PNG dans `game/img/`** avec les noms attendus (voir `img/README.md`) — ils remplacent
+**dépose tes PNG dans `img/`** avec les noms attendus (voir `img/README.md`) — ils remplacent
 les placeholders automatiquement, sans toucher au code, et sont **auto-redimensionnés** à la taille de jeu.
 Aucun changement de code nécessaire.
 ```
