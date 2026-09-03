@@ -23,12 +23,15 @@ import { goldReward, bossGoldReward } from "./shop";
 import { ClassId } from "./classes";
 import { abilityForSlot } from "./skills";
 import { Ally, Trap, castAbility, updateAllies, updateTraps, healFromLifesteal } from "./abilities";
-import type { Door, Chest } from "./dungeon";
+import type { Door, Chest, PressurePlate, RoomTrap } from "./dungeon";
 import type { Portal } from "./nexus";
 import { Archetype, resolveEnemyStats, ENEMY_SKINS } from "./enemies";
 import { updateEnemy } from "./ai";
 import { Boss, updateBoss } from "./boss";
 import { BiomeDef } from "./biomes";
+import { TerrainZone, onTerrain, terrainDps, terrainTickInterval } from "./terrain";
+import { getWorldEvent } from "./events";
+import { getDungeonMod } from "./dungeonMods";
 import { Vec2, v, sub, normalize, scale, distance, length } from "./math/vec2";
 
 export interface InputState {
@@ -159,9 +162,14 @@ export interface World {
   traps: Trap[];
   doors: Door[]; // portes de donjon (vides hors donjon)
   chests: Chest[]; // coffres de donjon
+  plates: PressurePlate[]; // plaques de pression (salles puzzle, tranche L)
+  roomTraps: RoomTrap[]; // pièges au sol (salles trap, tranche L)
   portals: Portal[]; // portails du Nexus (vides hors Nexus)
   level: Level;
   biome: BiomeDef | null;
+  eventId: string | null; // événement de monde actif (tranche K), null sinon
+  terrain: TerrainZone[]; // zones de terrain du biome (tranche K)
+  modId: string | null; // modificateur de donjon actif (tranche L), null sinon
   events: DamageEvent[];
   nextId: number;
   godMode: boolean;
@@ -273,7 +281,12 @@ export function defaultWorldState(): Pick<
   | "traps"
   | "doors"
   | "chests"
+  | "plates"
+  | "roomTraps"
   | "portals"
+  | "eventId"
+  | "terrain"
+  | "modId"
   | "events"
   | "exitReached"
   | "doorReached"
@@ -294,7 +307,12 @@ export function defaultWorldState(): Pick<
     traps: [],
     doors: [],
     chests: [],
+    plates: [],
+    roomTraps: [],
     portals: [],
+    eventId: null,
+    terrain: [],
+    modId: null,
     events: [],
     exitReached: false,
     doorReached: null,
@@ -381,6 +399,19 @@ function spawnLootDrop(w: World, x: number, y: number, biasLevel: number): void 
   const { tier, omega } = rarityToWeaponTier(r);
   const defId = randomWeaponIdOfTier(tier, w.rng); // arme nommée du catalogue, au tier tiré
   w.pickups.push({ id: w.nextId++, pos: { x, y }, radius: 16, defId, tier, omega, taken: false });
+}
+
+/** Chance de drop actuelle : BALANCE.dropChance × muls événement (K) et mod de donjon (L). */
+export function dropChanceFor(w: World): number {
+  const ev = getWorldEvent(w.eventId ?? "");
+  const mod = getDungeonMod(w.modId ?? "");
+  return BALANCE.dropChance * (ev?.effects.lootMul ?? 1) * (mod?.lootMul ?? 1);
+}
+
+/** Multiplicateur d'or actuel (mod de donjon L ; les événements K n'ont pas de goldMul). */
+export function goldMulFor(w: World): number {
+  const mod = getDungeonMod(w.modId ?? "");
+  return mod?.goldMul ?? 1;
 }
 
 /** Le joueur est-il invisible ? (Cape infinie cyclique OU capacité d'invisibilité active) */
@@ -515,6 +546,12 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
   const p = w.player;
   w.playerMods = derivePlayerMods(p); // armure + sets + stats (+ passifs d'arbre) — à jour chaque tick
 
+  // DONJON tranche L : modificateur — ralentissement appliqué AVANT le mouvement de ce tick
+  {
+    const mod = getDungeonMod(w.modId ?? "");
+    if (mod?.playerSpeedMul) w.playerMods.speedMul *= mod.playerSpeedMul;
+  }
+
   // PV max synchronisés avec la progression (stats + passifs d'arbre)
   const mh = maxHpFor(p);
   if (p.health.maxHp !== mh) {
@@ -579,10 +616,32 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
   // mouvement (sauf en dash ; pendant le hitstun on laisse glisser le knockback sans contrôle)
   if (!isDashing(p.dash)) {
     const moveInput = isStunned(p) ? v(0, 0) : input.moveDir;
-    const moveCfg = { ...t.move, maxSpeed: t.move.maxSpeed * w.playerMods.speedMul }; // type d'armure
+    const ev = getWorldEvent(w.eventId ?? "");
+    const onIce = onTerrain(w.terrain, "ice", p.transform.pos, p.radius);
+    const slip = ev?.effects.playerFrictionMul ?? (onIce ? 0.12 : 1);
+    const moveCfg = {
+      ...t.move,
+      maxSpeed: t.move.maxSpeed * w.playerMods.speedMul, // type d'armure
+      friction: t.move.friction * slip, // sol glissant (événement) / glace (terrain)
+    };
     applyMovementCollide(p.transform, moveInput, moveCfg, dt, playerOccupy);
   }
   p.transform.pos = clampToBounds(p.transform.pos, p.radius, w.level.bounds);
+
+  // vent d'événement : dérive externe constante, glisse le long des murs (jamais en dash)
+  if (!isDashing(p.dash)) {
+    const ev = getWorldEvent(w.eventId ?? "");
+    const wind = ev?.effects.wind;
+    if (wind) {
+      const dx = wind.dx * wind.force * dt;
+      const dy = wind.dy * wind.force * dt;
+      const nx = p.transform.pos.x + dx;
+      if (canOccupy({ x: nx, y: p.transform.pos.y }, p.radius, w.level)) p.transform.pos.x = nx;
+      const ny = p.transform.pos.y + dy;
+      if (canOccupy({ x: p.transform.pos.x, y: ny }, p.radius, w.level)) p.transform.pos.y = ny;
+      p.transform.pos = clampToBounds(p.transform.pos, p.radius, w.level.bounds);
+    }
+  }
 
   // blink (pas pendant le dash)
   if (input.blink && !isDashing(p.dash)) {
@@ -746,9 +805,9 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
   for (const e of w.enemies) {
     if (e.archetype === "dummy" || !isDead(e)) continue;
     addXp(p, Math.round(xpReward(e.archetype, biomeTier) * BALANCE.xpMult)); // XP même pour les sbires
-    p.gold += goldReward(biomeTier);
+    p.gold += Math.round(goldReward(biomeTier) * goldMulFor(w));
     if (e.name === "Sbire") continue; // sbires : pas de loot
-    if (w.rng() < BALANCE.dropChance) spawnLootDrop(w, e.transform.pos.x, e.transform.pos.y, biasLevel);
+    if (w.rng() < dropChanceFor(w)) spawnLootDrop(w, e.transform.pos.x, e.transform.pos.y, biasLevel);
     if (w.rng() < omganiumChance(biasLevel, "enemy")) spawnOmganium(w, e.transform.pos.x, e.transform.pos.y);
   }
   w.enemies = w.enemies.filter((e) => e.archetype === "dummy" || !isDead(e));
@@ -787,7 +846,7 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
         if (w.rng() < 0.2) p.armorInv.push(makeOmegaArmor(w.nextId++, OMEGA_ARMORS[Math.floor(w.rng() * OMEGA_ARMORS.length)]));
       }
       addXp(p, Math.round(bossXpReward(w.boss.tier) * BALANCE.xpMult));
-      p.gold += bossGoldReward(w.boss.tier);
+      p.gold += Math.round(bossGoldReward(w.boss.tier) * goldMulFor(w));
       w.events.push({ x: w.boss.transform.pos.x, y: w.boss.transform.pos.y, amount: 0, targetId: w.boss.id, crit: false });
       w.boss = null;
       w.enemies = w.enemies.filter((e) => e.name !== "Sbire"); // les sbires partent avec le boss
@@ -797,6 +856,44 @@ export function tickWorld(w: World, input: InputState, t: Tuning, dt: number): v
   // alliés invoqués + pièges
   updateAllies(w, dt);
   updateTraps(w, dt);
+
+  // DONJON tranche L : plaques de pression — le joueur marche dessus → active
+  for (const pl of w.plates) {
+    if (!pl.active && distance(p.transform.pos, v(pl.x, pl.y)) <= p.radius + pl.radius) pl.active = true;
+  }
+  // DONJON tranche L : pièges de salle (spikes/poison) — DoT cadencé via les i-frames
+  for (const tr of w.roomTraps) {
+    const interval = 0.4;
+    if (distance(p.transform.pos, v(tr.x, tr.y)) > p.radius + tr.radius) continue;
+    const dps = tr.kind === "poison" ? 5 : 10;
+    const dmg = Math.max(1, Math.round(dps * interval));
+    hurtPlayer(w, dmg, v(0, 0), interval);
+  }
+  // DONJON tranche L : modificateur — drain de vie (le ralentissement est appliqué en début de tick)
+  {
+    const mod = getDungeonMod(w.modId ?? "");
+    if (mod?.playerDps) {
+      const dmg = Math.max(1, Math.round(mod.playerDps * 0.5));
+      hurtPlayer(w, dmg, v(0, 0), 0.5);
+    }
+  }
+
+  // TERRAIN (tranche K) : zones dangereuses au sol — DoT cadencé via les i-frames de hurtPlayer
+  const dangerKinds: TerrainZone["kind"][] = ["lava", "poison", "spikes"];
+  for (const kind of dangerKinds) {
+    if (!onTerrain(w.terrain, kind, p.transform.pos, p.radius)) continue;
+    const interval = terrainTickInterval(kind);
+    const dmg = Math.max(1, Math.round(terrainDps(kind) * interval));
+    hurtPlayer(w, dmg, v(0, 0), interval);
+  }
+  // ÉVÉNEMENT (tranche K) : DoT ambiant (pluie acide, zone corrompue) — cadencé 0.5 s
+  {
+    const ev = getWorldEvent(w.eventId ?? "");
+    if (ev?.effects.playerDps) {
+      const dmg = Math.max(1, Math.round(ev.effects.playerDps * 0.5));
+      hurtPlayer(w, dmg, v(0, 0), 0.5);
+    }
+  }
 
   // jet de l'arme active (touche X) — sauf les Poings (slot 0)
   if (input.drop) {

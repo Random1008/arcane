@@ -6,9 +6,11 @@ import { saveToServer } from "../net/saveClient";
 import { emitGameEvent } from "../net/adminClient";
 import { playSfx, playMusic } from "../audio/audioEngine";
 import { generateBiomeWorld } from "../../core/generate";
-import { generateDungeon, generateRoomWorld, roomById, opposite, entryPos, Dungeon, Dir } from "../../core/dungeon";
+import { generateDungeon, generateRoomWorld, roomById, opposite, entryPos, Dungeon, Dir, isPuzzleRoom, puzzleResolved } from "../../core/dungeon";
+import { getDungeonMod } from "../../core/dungeonMods";
 import { generateNexusHub, generateNexusRoom, clearNexusRoom, Portal, NEXUS_LEVEL_LABEL, NEXUS_LEVELS } from "../../core/nexus";
 import { getBiome } from "../../core/biomes";
+import { getWorldEvent } from "../../core/events";
 import { respawnPlayer } from "../../core/death";
 import { DEFAULT_TUNING } from "../../core/config/tuning";
 import { FixedStep } from "../../core/time/fixedStep";
@@ -134,6 +136,9 @@ export class BiomeScene extends Phaser.Scene {
       this.world = this.getRoomWorld(this.currentRoomId);
       this.world.player.transform.pos = { x: this.world.level.bounds.w / 2, y: this.world.level.bounds.h - 90 };
       this.world.player.health.iframes = Math.max(this.world.player.health.iframes, 0.6); // grâce d'entrée
+      // bandeau du modificateur de donjon (tranche L)
+      const mod = getDungeonMod(this.dungeon.modId ?? "");
+      if (mod) this.banner(`⚠ Donjon ${mod.name}`, "#ffb38a");
     } else {
       this.world = generateBiomeWorld(getPlayer(), biome, Math.random, isRingFinal(this.biomeId));
       this.dungeon = null; // libère l'état donjon (cache de salles) en mode biome
@@ -216,6 +221,15 @@ export class BiomeScene extends Phaser.Scene {
       .text(12, 12, "", { fontFamily: "monospace", fontSize: "14px", color: "#eef" })
       .setScrollFactor(0)
       .setDepth(20);
+    // brouillard d'événement (tranche K) : voile sombre plein écran selon le rayon de vision
+    const evDef = this.world.eventId ? getWorldEvent(this.world.eventId) : null;
+    const vr = evDef?.effects.visionRadius;
+    if (vr) {
+      const sw = this.scale.width;
+      const sh = this.scale.height;
+      const alpha = vr <= 150 ? 0.82 : 0.6;
+      this.add.rectangle(sw / 2, sh / 2, sw, sh, 0x05070d, alpha).setScrollFactor(0).setDepth(50);
+    }
     this.cameras.main.setBackgroundColor((this.world.biome ?? biome).palette.ground);
     const lb = this.world.level.bounds;
     this.cameras.main.setBounds(0, 0, lb.w, lb.h);
@@ -320,10 +334,28 @@ export class BiomeScene extends Phaser.Scene {
   private getRoomWorld(roomId: number): World {
     let w = this.roomCache.get(roomId);
     if (!w) {
-      w = generateRoomWorld(getPlayer(), getBiome(this.biomeId), roomById(this.dungeon!, roomId), Math.random);
+      w = generateRoomWorld(
+        getPlayer(),
+        getBiome(this.biomeId),
+        roomById(this.dungeon!, roomId),
+        Math.random,
+        this.dungeon?.modId ?? null,
+      );
       this.roomCache.set(roomId, w);
     }
     return w;
+  }
+
+  /** Bandeau temporaire centré (modificateur de donjon, etc.). */
+  private banner(text: string, color: string): void {
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height / 2 - 80;
+    const t = this.add
+      .text(cx, cy, text, { fontFamily: "monospace", fontSize: "18px", color, fontStyle: "bold" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(45);
+    this.tweens.add({ targets: t, alpha: 0, delay: 2400, duration: 900, onComplete: () => t.destroy() });
   }
 
   /** Change de salle de donjon (cache l'état nettoyé). */
@@ -358,7 +390,20 @@ export class BiomeScene extends Phaser.Scene {
   private updateDungeon(): void {
     if (!this.dungeon) return;
     const room = roomById(this.dungeon, this.currentRoomId);
-    if (room.cleared || this.world.enemies.length > 0 || this.world.boss !== null) return;
+    if (room.cleared) return;
+    // salle puzzle : résolue quand toutes les plaques sont actives (pas d'ennemis à tuer)
+    if (isPuzzleRoom(room)) {
+      if (!puzzleResolved(this.world.plates)) return;
+      room.cleared = true;
+      playMusic(this.musicContext());
+      for (const door of this.world.doors) door.open = true;
+      for (const door of this.world.doors) {
+        const nb = this.roomCache.get(door.to);
+        if (nb) for (const nd of nb.doors) if (nd.to === this.currentRoomId) nd.open = true;
+      }
+      return;
+    }
+    if (this.world.enemies.length > 0 || this.world.boss !== null) return;
     room.cleared = true;
     playMusic(this.musicContext()); // salle (et mini-boss éventuel) vaincue → musique d'exploration
     for (const door of this.world.doors) door.open = true;
@@ -776,6 +821,12 @@ export class BiomeScene extends Phaser.Scene {
     this.gfx.lineStyle(1, 0x000000, 0.08);
     for (let gx = 0; gx <= lvl.bounds.w; gx += 64) this.gfx.lineBetween(gx, 0, gx, lvl.bounds.h);
     for (let gy = 0; gy <= lvl.bounds.h; gy += 64) this.gfx.lineBetween(0, gy, lvl.bounds.w, gy);
+    // zones de terrain (tranche K) : dessinées sous les murs/entités
+    for (const z of this.world.terrain) {
+      const col = z.kind === "lava" ? 0xff5a1f : z.kind === "poison" ? 0x7adf4a : z.kind === "ice" ? 0x9fd8ff : 0x8890a8;
+      this.gfx.fillStyle(col, 0.45).fillRect(z.x, z.y, z.w, z.h);
+      this.gfx.lineStyle(2, col, 0.8).strokeRect(z.x, z.y, z.w, z.h);
+    }
     // plateforme de pierre du hub (Sanctuaire)
     if (this.biomeId === "spawn") {
       this.gfx.fillStyle(0x5a6072, 1).fillRect(100, 150, 800, 250);
@@ -805,6 +856,19 @@ export class BiomeScene extends Phaser.Scene {
     for (const ch of this.world.chests) {
       this.gfx.fillStyle(ch.opened ? 0x6a5a2a : 0xffd24a, 0.95).fillRect(ch.pos.x - 12, ch.pos.y - 10, 24, 20);
       this.gfx.lineStyle(2, 0x3a2f10, 1).strokeRect(ch.pos.x - 12, ch.pos.y - 10, 24, 20);
+    }
+    // plaques de pression (salles puzzle, tranche L)
+    for (const pl of this.world.plates) {
+      this.gfx.fillStyle(pl.active ? 0x7dffb0 : biome.palette.accent, pl.active ? 0.85 : 0.55).fillCircle(pl.x, pl.y, pl.radius);
+      this.gfx.lineStyle(2, pl.active ? 0xffffff : 0x000000, pl.active ? 0.9 : 0.5).strokeCircle(pl.x, pl.y, pl.radius);
+      this.gfx.lineStyle(3, pl.active ? 0x2a6a4a : 0x000000, 0.8).lineBetween(pl.x - 7, pl.y, pl.x + 7, pl.y);
+      this.gfx.lineBetween(pl.x, pl.y - 7, pl.x, pl.y + 7);
+    }
+    // pièges de salle (tranche L)
+    for (const tr of this.world.roomTraps) {
+      const col = tr.kind === "poison" ? 0x7adf4a : 0x8890a8;
+      this.gfx.fillStyle(col, 0.4).fillCircle(tr.x, tr.y, tr.radius);
+      this.gfx.lineStyle(2, col, 0.9).strokeCircle(tr.x, tr.y, tr.radius);
     }
     // portails (Nexus + entrée Nexus au Sanctuaire)
     const seenPortals = new Set<number>();
@@ -1057,16 +1121,23 @@ export class BiomeScene extends Phaser.Scene {
       const room = roomById(this.dungeon, this.currentRoomId);
       const total = this.dungeon.rooms.length;
       const done = this.dungeon.rooms.filter((r) => r.cleared).length;
+      const platesLeft = this.world.plates.filter((p) => !p.active).length;
       const roomTag =
         this.world.boss !== null
           ? "  ⚔ MINI-BOSS"
-          : this.world.enemies.length > 0
-            ? `  ennemis: ${this.world.enemies.length}`
-            : room.kind === "boss"
-              ? "  ✓ Donjon terminé — portail ouvert"
-              : "  ✓ salle nettoyée";
+          : isPuzzleRoom(room)
+            ? platesLeft > 0
+              ? `  plaques: ${this.world.plates.length - platesLeft}/${this.world.plates.length}`
+              : "  ✓ énigme résolue"
+            : this.world.enemies.length > 0
+              ? `  ennemis: ${this.world.enemies.length}`
+              : room.kind === "boss"
+                ? "  ✓ Donjon terminé — portail ouvert"
+                : "  ✓ salle nettoyée";
+      const modName = getDungeonMod(this.world.modId ?? "")?.name;
+      const modTxt = modName ? `   ☠ ${modName}` : "";
       this.hud.setText(
-        `Donjon ${biome.name} [${biome.tier}]${lvlTxt}   PV ${Math.round(pl.health.hp)}/${pl.health.maxHp}   Arme: ${wpn}${omg}   Salles ${done}/${total} (prof. ${room.depth})${roomTag}${fps}`,
+        `Donjon ${biome.name} [${biome.tier}]${lvlTxt}   PV ${Math.round(pl.health.hp)}/${pl.health.maxHp}   Arme: ${wpn}${omg}   Salles ${done}/${total} (prof. ${room.depth})${roomTag}${modTxt}${fps}`,
       );
     } else {
       const clr = this.cleared
@@ -1076,8 +1147,10 @@ export class BiomeScene extends Phaser.Scene {
           : this.hadEnemies
             ? `  ennemis: ${this.world.enemies.length}`
             : "";
+      const evName = getWorldEvent(this.world.eventId ?? "")?.name;
+      const evTxt = evName ? `   ⚡ ${evName}` : "";
       this.hud.setText(
-        `${biome.name} [${biome.tier}]${lvlTxt}   PV ${Math.round(pl.health.hp)}/${pl.health.maxHp}   Arme: ${wpn}${omg}   (M=carte, I=équip, P=stats, K=classe, Entrée=chat)${clr}${fps}`,
+        `${biome.name} [${biome.tier}]${lvlTxt}   PV ${Math.round(pl.health.hp)}/${pl.health.maxHp}   Arme: ${wpn}${omg}${evTxt}   (M=carte, I=équip, P=stats, K=classe, Entrée=chat)${clr}${fps}`,
       );
     }
   }

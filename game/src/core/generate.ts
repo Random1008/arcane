@@ -9,6 +9,8 @@ import { computePlayerMods } from "./sets";
 import { Rect, Level, canOccupy } from "./collision";
 import { Player, World, Enemy, Exit, DungeonEntrance, WeaponPickup, Npc, makeEnemy, defaultWorldState } from "./world";
 import { Vec2, v, distance } from "./math/vec2";
+import { rollWorldEvent, getWorldEvent } from "./events";
+import { TerrainZone, BIOME_TERRAIN, zoneCountFor, placeZone } from "./terrain";
 
 const rectNear = (r: Rect, p: Vec2, dist: number): boolean =>
   p.x >= r.x - dist && p.x <= r.x + r.w + dist && p.y >= r.y - dist && p.y <= r.y + r.h + dist;
@@ -73,11 +75,19 @@ export function generateBiomeWorld(player: Player, biome: BiomeDef, rng: () => n
   const placed: Placed[] = [{ pos: exitPos, radius: 28 }];
 
   // dernier biome de l'anneau → le boss du rang, pas d'ennemis réguliers ; sinon, ennemis scalés par rang
+  // événement de monde (tranche K) : jamais au Sanctuaire ; modifie ennemis/boss créés ci-dessous
+  const eventId = biome.id === "spawn" ? null : rollWorldEvent(biome.tier, rng);
+  const evFx = eventId ? getWorldEvent(eventId)?.effects : undefined;
+  const hpMul = evFx?.enemyHpMul ?? 1;
+  const atkMul = evFx?.enemyAtkMul ?? 1;
   let boss: Boss | null = null;
   const enemies: Enemy[] = [];
   let id = 100;
   if (finalBoss && biome.id !== "spawn") {
     boss = makeBoss(bossForTier(biome.tier), biome.tier, biome.size.w / 2, 140);
+    boss.health.maxHp = Math.max(1, Math.round(boss.health.maxHp * hpMul));
+    boss.health.hp = boss.health.maxHp;
+    boss.contactDamage = Math.round(boss.contactDamage * atkMul);
     placed.push({ pos: { x: boss.transform.pos.x, y: boss.transform.pos.y }, radius: boss.radius });
   } else {
     const types = enemyTypesForBiome(biome.id);
@@ -87,7 +97,13 @@ export function generateBiomeWorld(player: Player, biome: BiomeDef, rng: () => n
       const pos = freeSpawn(rng, level, entry, 220, 14, placed);
       placed.push({ pos, radius: 14 });
       const tp = types[Math.floor(rng() * types.length)];
-      enemies.push(makeEnemy(id++, pos.x, pos.y, tp.archetype, biome.tier, tp.name));
+      const e = makeEnemy(id++, pos.x, pos.y, tp.archetype, biome.tier, tp.name);
+      if (hpMul !== 1) {
+        e.health.maxHp = Math.max(1, Math.round(e.health.maxHp * hpMul));
+        e.health.hp = e.health.maxHp;
+      }
+      if (atkMul !== 1) e.contactDamage = Math.round(e.contactDamage * atkMul);
+      enemies.push(e);
     }
   }
 
@@ -137,6 +153,24 @@ export function generateBiomeWorld(player: Player, biome: BiomeDef, rng: () => n
     dungeonEntrances.push({ id: 800 + i, pos, radius: 22 });
   }
 
+  // zones de terrain (tranche K) : selon la table du biome, en évitant entrée/sortie/donjons
+  const kinds = BIOME_TERRAIN[biome.id] ?? [];
+  const terrain: TerrainZone[] = [];
+  if (kinds.length > 0) {
+    const avoid: Rect[] = [
+      { x: entry.x - 90, y: entry.y - 90, w: 180, h: 180 },
+      { x: exitPos.x - 80, y: exitPos.y - 80, w: 160, h: 160 },
+      ...dungeonEntrances.map((d) => ({ x: d.pos.x - 70, y: d.pos.y - 70, w: 140, h: 140 })),
+    ];
+    const n = zoneCountFor(rng);
+    let zid = 1;
+    for (let i = 0; i < n; i++) {
+      const kind = kinds[Math.floor(rng() * kinds.length)];
+      const z = placeZone(rng, kind, bounds, avoid);
+      if (z) terrain.push({ ...z, id: zid++ });
+    }
+  }
+
   return {
     ...defaultWorldState(),
     player,
@@ -149,6 +183,8 @@ export function generateBiomeWorld(player: Player, biome: BiomeDef, rng: () => n
     boss,
     level,
     biome,
+    eventId,
+    terrain,
     nextId: id + 1000,
     rng,
   };
